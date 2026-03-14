@@ -67,6 +67,8 @@ fun DailyTasks(
     isProgrammaticScroll: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var expandedEventId by remember { mutableStateOf<String?>(null) }
+
     LazyColumn(
         state = listState,
         modifier = modifier
@@ -89,8 +91,15 @@ fun DailyTasks(
             }
 
             if (timedEvents.isNotEmpty()) {
-                items(timedEvents, key = { "${it.hashCode()}_${date}_${it.title}" }) { event ->
-                    EventItem(event = event)
+                items(timedEvents, key = { "${it.id}_${it.startTime}_${it.title}" }) { event ->
+                    val eventId = "${event.id}_${event.startTime}_${event.title}"
+                    EventItem(
+                        event = event,
+                        isExpanded = expandedEventId == eventId,
+                        onExpandToggled = {
+                            expandedEventId = if (expandedEventId == eventId) null else eventId
+                        }
+                    )
                 }
             } else if (allDayEvents.isEmpty()) {
                 item(key = "empty_$date") {
@@ -123,7 +132,10 @@ fun DailyTasks(
                             key.startsWith("divider_") -> key.removePrefix("divider_")
                             else -> {
                                 val parts = key.split("_")
-                                if (parts.size >= 2) parts[1] else null
+                                if (parts.size >= 2) {
+                                    // Try to see if it's a date string
+                                    parts.firstOrNull { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
+                                } else null
                             }
                         }
                         
@@ -211,15 +223,18 @@ fun AllDayEventsRow(events: List<DraftEvent>) {
 }
 
 @Composable
-fun EventItem(event: DraftEvent) {
-    var expanded by remember { mutableStateOf(false) }
+fun EventItem(
+    event: DraftEvent,
+    isExpanded: Boolean,
+    onExpandToggled: () -> Unit
+) {
     val eventColor = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .clickable { onExpandToggled() }
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -271,7 +286,7 @@ fun EventItem(event: DraftEvent) {
         }
 
         AnimatedVisibility(
-            visible = expanded,
+            visible = isExpanded,
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {

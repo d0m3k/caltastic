@@ -3,27 +3,15 @@ package pl.dom3k.caltastic.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,15 +28,34 @@ fun DayTicker(
     days: List<LocalDate>,
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier
+    onDateFocused: (LocalDate) -> Unit,
+    isProgrammaticScroll: Boolean,
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
 ) {
-    val listState = rememberLazyListState()
-
-    // Scroll to the selected date if it changes
+    // Scroll to the selected date if it changes externally (e.g. from DailyTasks scroll)
     LaunchedEffect(selectedDate) {
-        val index = days.indexOf(selectedDate)
-        if (index >= 0) {
-            listState.animateScrollToItem(index, scrollOffset = -200)
+        if (!listState.isScrollInProgress) {
+            val index = days.indexOf(selectedDate)
+            if (index >= 0) {
+                // Offset to center the selected date roughly at the 2nd position
+                listState.animateScrollToItem(index, scrollOffset = -150)
+            }
+        }
+    }
+
+    // Report "focused" date (item at a certain offset) when user scrolls the ticker
+    // We restart this effect if isProgrammaticScroll changes to correctly suppress sync-back
+    LaunchedEffect(listState.isScrollInProgress, isProgrammaticScroll) {
+        if (listState.isScrollInProgress && !isProgrammaticScroll) {
+            snapshotFlow { listState.firstVisibleItemIndex }
+                .collect { firstVisible ->
+                    // Focus on the 2nd visible item if available to match the offset used in animateScrollToItem
+                    val focusIndex = (firstVisible + 1).coerceAtMost(days.size - 1)
+                    if (focusIndex >= 0 && focusIndex < days.size) {
+                        onDateFocused(days[focusIndex])
+                    }
+                }
         }
     }
 
@@ -61,7 +68,7 @@ fun DayTicker(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp),
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
@@ -83,6 +90,7 @@ fun DayTickerItem(
     onClick: () -> Unit
 ) {
     val dayOfWeek = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
     val dayOfMonth = date.dayOfMonth.toString()
     val isToday = date == LocalDate.now()
     
@@ -95,6 +103,7 @@ fun DayTickerItem(
     
     val contentColor by animateColorAsState(
         targetValue = if (isSelected) MaterialTheme.colorScheme.primary 
+                      else if (isToday) MaterialTheme.colorScheme.primary
                       else MaterialTheme.colorScheme.onSurface,
         label = "contentColor"
     )
@@ -106,7 +115,7 @@ fun DayTickerItem(
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         color = containerColor,
         tonalElevation = elevation,
         modifier = Modifier
@@ -139,7 +148,7 @@ fun DayTickerItem(
                     modifier = Modifier
                         .padding(top = 2.dp)
                         .size(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(androidx.compose.foundation.shape.CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }

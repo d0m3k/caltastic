@@ -161,8 +161,8 @@ class CalendarRepository(private val context: Context) {
         return eventsMap
     }
 
-    fun addEvent(draftEvent: DraftEvent): Boolean {
-        val calendarId = getDefaultCalendarId() ?: return false
+    fun addEvent(draftEvent: DraftEvent, calendarId: Long? = null): Boolean {
+        val targetCalendarId = calendarId ?: getDefaultCalendarId() ?: return false
         
         val date = draftEvent.date ?: LocalDate.now()
         val startMillis: Long
@@ -190,7 +190,7 @@ class CalendarRepository(private val context: Context) {
             put(CalendarContract.Events.DTSTART, startMillis)
             put(CalendarContract.Events.DTEND, endMillis)
             put(CalendarContract.Events.TITLE, draftEvent.title)
-            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.CALENDAR_ID, targetCalendarId)
             put(CalendarContract.Events.EVENT_TIMEZONE, if (draftEvent.isAllDay) "UTC" else ZoneId.systemDefault().id)
             put(CalendarContract.Events.ALL_DAY, if (draftEvent.isAllDay) 1 else 0)
         }

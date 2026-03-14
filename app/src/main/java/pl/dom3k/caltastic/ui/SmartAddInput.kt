@@ -27,6 +27,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SmartAddInput(
     onAddEvent: (DraftEvent) -> Unit,
+    defaultCalendarName: String,
     modifier: Modifier = Modifier
 ) {
     var text by remember { mutableStateOf("") }
@@ -48,12 +49,22 @@ fun SmartAddInput(
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            Text(
-                text = "Szybkie dodawanie",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp, start = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Szybkie dodawanie",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Kalendarz: $defaultCalendarName",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
 
             OutlinedTextField(
                 value = text,
