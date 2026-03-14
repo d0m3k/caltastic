@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <!-- Abstract background pattern for 'Fantastic' feel -->
+    <path
+        android:fillColor="#283593"
+        android:pathData="M0,0 L108,0 L108,108 Z" />
+    <path
+        android:fillColor="#303F9F"
+        android:pathData="M0,108 L108,108 L0,0 Z" />
+</vector>
