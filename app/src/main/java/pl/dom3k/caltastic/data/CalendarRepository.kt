@@ -114,6 +114,7 @@ class CalendarRepository(private val context: Context) {
             null,
             "${CalendarContract.Instances.BEGIN} ASC"
         )?.use { cursor ->
+            val eventIdIndex = cursor.getColumnIndex(CalendarContract.Instances.EVENT_ID)
             val titleIndex = cursor.getColumnIndex(CalendarContract.Instances.TITLE)
             val beginIndex = cursor.getColumnIndex(CalendarContract.Instances.BEGIN)
             val endIndex = cursor.getColumnIndex(CalendarContract.Instances.END)
@@ -124,6 +125,7 @@ class CalendarRepository(private val context: Context) {
             val calNameIndex = cursor.getColumnIndex(CalendarContract.Instances.CALENDAR_DISPLAY_NAME)
 
             while (cursor.moveToNext()) {
+                val eventId = cursor.getLong(eventIdIndex)
                 val title = cursor.getString(titleIndex) ?: "Szkic wydarzenia"
                 val beginMillis = cursor.getLong(beginIndex)
                 val endMillis = cursor.getLong(endIndex)
@@ -139,6 +141,7 @@ class CalendarRepository(private val context: Context) {
                 val eventDate = startZonedDateTime.toLocalDate()
 
                 val event = DraftEvent(
+                    id = eventId,
                     title = title,
                     date = eventDate,
                     startTime = if (isAllDay) null else startZonedDateTime.toLocalTime(),

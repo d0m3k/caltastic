@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 data class DraftEvent(
+    val id: Long? = null,
     val title: String,
     val date: LocalDate?,
     val startTime: LocalTime?,

@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,7 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +44,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val dailyTasksListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }
+    
+    // Flag to ignore scroll sync events during programmatic scrolling
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+    var scrollJob by remember { mutableStateOf<Job?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -59,25 +66,53 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         }
     }
 
+    // Scroll to today on first load
+    var initialScrollDone by remember { mutableStateOf(false) }
+    LaunchedEffect(events) {
+        if (!initialScrollDone && days.isNotEmpty()) {
+            delay(300) // Ensure layout is settled
+            val targetIndex = findIndexByDate(today, days, events)
+            if (targetIndex != -1) {
+                isProgrammaticScroll = true
+                dailyTasksListState.scrollToItem(targetIndex)
+                delay(100)
+                isProgrammaticScroll = false
+            }
+            if (events.isNotEmpty()) {
+                initialScrollDone = true
+            }
+        }
+    }
+
+    val onDateSelected: (LocalDate) -> Unit = { date ->
+        // Always trigger scroll even if selectedDate is the same, to allow re-centering/snapping
+        selectedDate = date
+        scrollJob?.cancel()
+        scrollJob = coroutineScope.launch {
+            isProgrammaticScroll = true
+            val targetIndex = findIndexByDate(date, days, events)
+            if (targetIndex != -1) {
+                // Use a slightly faster animation or just scrollToItem if it feels laggy
+                dailyTasksListState.animateScrollToItem(targetIndex)
+            }
+            // Wait for scroll to fully settle before re-enabling sync from list to ticker
+            delay(600) 
+            isProgrammaticScroll = false
+        }
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Caltastic", fontWeight = FontWeight.Black) },
                 actions = {
                     IconButton(onClick = { showCalendarSettings = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Kalendarze")
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Kalendarze")
                     }
                 },
                 navigationIcon = {
                     TextButton(onClick = {
-                        selectedDate = today
-                        coroutineScope.launch {
-                            val targetKey = "header_$today"
-                            val targetIndex = findIndexByDateKey(dailyTasksListState, targetKey, days, events)
-                            if (targetIndex != -1) {
-                                dailyTasksListState.animateScrollToItem(targetIndex)
-                            }
-                        }
+                        onDateSelected(today)
                     }) {
                         Text("Dzisiaj", fontWeight = FontWeight.Bold)
                     }
@@ -100,27 +135,19 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             DayTicker(
                 days = days,
                 selectedDate = selectedDate,
-                onDateSelected = { date ->
-                    selectedDate = date
-                    coroutineScope.launch {
-                        val targetKey = "header_$date"
-                        val targetIndex = findIndexByDateKey(dailyTasksListState, targetKey, days, events)
-                        if (targetIndex != -1) {
-                            dailyTasksListState.animateScrollToItem(targetIndex)
-                        }
-                    }
-                }
+                onDateSelected = onDateSelected
             )
 
             DailyTasks(
                 allDays = days,
                 groupedEvents = events,
                 onVisibleDayChanged = { date ->
-                    if (selectedDate != date) {
+                    if (!isProgrammaticScroll && selectedDate != date) {
                         selectedDate = date
                     }
                 },
                 listState = dailyTasksListState,
+                isProgrammaticScroll = isProgrammaticScroll,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -178,24 +205,28 @@ fun CalendarSettingsDialog(
     )
 }
 
-private fun findIndexByDateKey(
-    state: androidx.compose.foundation.lazy.LazyListState,
-    key: String,
+fun findIndexByDate(
+    targetDate: LocalDate,
     allDays: List<LocalDate>,
-    events: Map<LocalDate, List<pl.dom3k.caltastic.parser.DraftEvent>>
+    events: Map<LocalDate, List<DraftEvent>>
 ): Int {
     var currentIndex = 0
     for (date in allDays) {
-        val headerKey = "header_$date"
-        if (headerKey == key) return currentIndex
-        currentIndex++ // Header
-        
-        val dayEvents = events[date] ?: emptyList()
-        val (allDay, timed) = dayEvents.partition { it.isAllDay }
-        
-        if (allDay.isNotEmpty()) currentIndex++ // AllDayRow
-        currentIndex += timed.size // Timed items
-        if (dayEvents.isEmpty() && allDay.isEmpty()) currentIndex++ // Empty placeholder
+        if (date == targetDate) return currentIndex
+        currentIndex += calculateItemsForDay(date, events)
     }
     return -1
+}
+
+fun calculateItemsForDay(date: LocalDate, events: Map<LocalDate, List<DraftEvent>>): Int {
+    var count = 1 // Header
+    val dayEvents = events[date] ?: emptyList()
+    val (allDay, timed) = dayEvents.partition { it.isAllDay }
+    
+    if (allDay.isNotEmpty()) count++ // AllDayRow
+    count += timed.size // Timed items
+    if (dayEvents.isEmpty()) count++ // Empty placeholder
+    
+    count++ // Divider
+    return count
 }
