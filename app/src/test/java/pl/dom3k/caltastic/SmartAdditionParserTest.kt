@@ -1,7 +1,6 @@
 package pl.dom3k.caltastic
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import pl.dom3k.caltastic.parser.SmartAdditionParser
@@ -18,7 +17,7 @@ class SmartAdditionParserTest {
         
         assertEquals("Kawa", result.title)
         assertEquals(LocalDate.now().plusDays(1), result.date)
-        assertEquals(LocalTime.of(13, 0), result.time)
+        assertEquals(LocalTime.of(13, 0), result.startTime)
         assertTrue(result.isComplete)
     }
 
@@ -28,7 +27,7 @@ class SmartAdditionParserTest {
         
         assertEquals("spotkanie", result.title)
         assertEquals(LocalDate.now(), result.date)
-        assertEquals(null, result.time)
+        assertEquals(null, result.startTime)
         assertTrue(result.isComplete)
     }
 
@@ -38,7 +37,7 @@ class SmartAdditionParserTest {
         
         assertEquals("Wizyta u lekarza", result.title)
         assertEquals(LocalDate.of(LocalDate.now().year, 4, 12), result.date)
-        assertEquals(LocalTime.of(15, 30), result.time)
+        assertEquals(LocalTime.of(15, 30), result.startTime)
         assertTrue(result.isComplete)
     }
 
@@ -48,7 +47,7 @@ class SmartAdditionParserTest {
         
         assertEquals("Lunch", result.title)
         assertEquals(LocalDate.now(), result.date)
-        assertEquals(LocalTime.of(12, 30), result.time)
+        assertEquals(LocalTime.of(12, 30), result.startTime)
         assertTrue(result.isComplete)
     }
 }
