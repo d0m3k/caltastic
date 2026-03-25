@@ -22,6 +22,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,12 +32,14 @@ import kotlinx.coroutines.launch
 import pl.dom3k.caltastic.R
 import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val events by viewModel.events.collectAsState()
     val calendars by viewModel.calendars.collectAsState()
     val selectedCalendarIds by viewModel.selectedCalendarIds.collectAsState()
@@ -58,6 +63,19 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     
     var scrollJob by remember { mutableStateOf<Job?>(null) }
 
+    // Listen to lifecycle changes to refresh data when app is reopened
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -80,7 +98,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     LaunchedEffect(events) {
         if (!initialScrollDone && days.isNotEmpty() && events.isNotEmpty()) {
             delay(300) // Ensure layout is settled
-            val targetIndex = findIndexByDate(today, days, events)
+            val targetIndex = findIndexByDate(today, days, events, smartToday = true)
             if (targetIndex != -1) {
                 isDailyTasksProgrammaticScroll = true
                 dailyTasksListState.scrollToItem(targetIndex)
@@ -101,8 +119,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         
         scrollJob = coroutineScope.launch {
             try {
-                val targetIndex = findIndexByDate(date, days, events)
-                // DayTicker handles its own animation via LaunchedEffect(selectedDate)
+                // If selecting Today, use smart scroll logic
+                val targetIndex = findIndexByDate(date, days, events, smartToday = date == today)
                 
                 if (targetIndex != -1) {
                     dailyTasksListState.animateScrollToItem(targetIndex)
@@ -307,11 +325,52 @@ fun CalendarSettingsDialog(
 fun findIndexByDate(
     targetDate: LocalDate,
     allDays: List<LocalDate>,
-    events: Map<LocalDate, List<DraftEvent>>
+    events: Map<LocalDate, List<DraftEvent>>,
+    smartToday: Boolean = false
 ): Int {
     var currentIndex = 0
+    val today = LocalDate.now()
+    val currentTime = LocalTime.now()
+
     for (date in allDays) {
-        if (date == targetDate) return currentIndex
+        if (date == targetDate) {
+            if (smartToday && date == today) {
+                // Smart scroll for Today
+                val dayEvents = events[date] ?: emptyList()
+                val (allDay, timed) = dayEvents.partition { it.isAllDay }
+                val sortedTimed = timed.sortedBy { it.startTime }
+
+                // Find the first event that is NOT past (current or future)
+                var firstNonPastIndex = -1
+                for (i in sortedTimed.indices) {
+                    val event = sortedTimed[i]
+                    val isPast = event.endTime?.let { it < currentTime } ?: (event.startTime?.let { it < currentTime } ?: false)
+                    if (!isPast) {
+                        firstNonPastIndex = i
+                        break
+                    }
+                }
+
+                return if (firstNonPastIndex != -1) {
+                    // Start with Header
+                    var offset = 1 
+                    if (allDay.isNotEmpty()) offset++ // AllDayRow
+                    
+                    // We want to scroll to "current/indicator minus one event"
+                    // If firstNonPastIndex is 0, we just scroll to header (offset 0 relative to day start)
+                    // If it's > 0, we scroll to the event before it.
+                    
+                    if (firstNonPastIndex > 0) {
+                        currentIndex + offset + (firstNonPastIndex - 1)
+                    } else {
+                        currentIndex // Just top of Today
+                    }
+                } else {
+                    currentIndex // Just top of Today
+                }
+            }
+            return currentIndex
+        }
         currentIndex += calculateItemsForDay(date, events)
     }
     return -1
@@ -321,11 +380,15 @@ fun calculateItemsForDay(date: LocalDate, events: Map<LocalDate, List<DraftEvent
     var count = 1 // Header
     val dayEvents = events[date] ?: emptyList()
     val (allDay, timed) = dayEvents.partition { it.isAllDay }
+    val isToday = date == LocalDate.now()
     
     if (allDay.isNotEmpty()) count++ // AllDayRow
     count += timed.size // Timed items
     if (dayEvents.isEmpty()) count++ // Empty placeholder
     
+    // Account for TimeIndicatorRow on today
+    if (isToday) count++ 
+
     count++ // Divider
     return count
 }

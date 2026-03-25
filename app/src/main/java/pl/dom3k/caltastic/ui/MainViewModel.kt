@@ -45,7 +45,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     init {
-        loadCalendars()
+        refresh()
         application.contentResolver.registerContentObserver(
             CalendarContract.Events.CONTENT_URI,
             true,
@@ -64,11 +64,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         getApplication<Application>().contentResolver.unregisterContentObserver(observer)
     }
 
-    private fun loadCalendars() {
+    fun refresh() {
         viewModelScope.launch {
             val fetchedCalendars = calendarRepository.getCalendars()
             _calendars.value = fetchedCalendars
-            _selectedCalendarIds.value = fetchedCalendars.filter { it.isVisible }.map { it.id }.toSet()
+            
+            val savedIds = prefs.getStringSet("selected_calendar_ids", null)
+            if (savedIds != null) {
+                _selectedCalendarIds.value = savedIds.map { it.toLong() }.toSet()
+            } else {
+                // If it's first load and no prefs, we trust the "visible" flag from system
+                _selectedCalendarIds.value = fetchedCalendars.filter { it.isVisible }.map { it.id }.toSet()
+            }
             
             val savedId = prefs.getLong("default_calendar_id", -1L)
             if (savedId != -1L && fetchedCalendars.any { it.id == savedId }) {
@@ -76,12 +83,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 _defaultCalendarId.value = fetchedCalendars.firstOrNull { it.isVisible }?.id
             }
+            
+            refreshEvents()
         }
     }
 
     fun toggleCalendar(id: Long) {
         _selectedCalendarIds.update { current ->
-            if (current.contains(id)) current - id else current + id
+            val newSet = if (current.contains(id)) current - id else current + id
+            prefs.edit().putStringSet("selected_calendar_ids", newSet.map { it.toString() }.toSet()).apply()
+            newSet
         }
         refreshEvents()
     }
@@ -100,7 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val range = currentRange ?: return
         viewModelScope.launch {
             try {
-                val fetchedEvents = calendarRepository.getEvents(range.first, range.second)
+                val fetchedEvents = calendarRepository.getEvents(range.first, range.second, _selectedCalendarIds.value)
                 _events.value = fetchedEvents
             } catch (e: Exception) {
                 // Handle error

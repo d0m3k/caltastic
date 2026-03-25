@@ -85,7 +85,7 @@ class CalendarRepository(private val context: Context) {
         return null
     }
 
-    fun getEvents(startDate: LocalDate, endDate: LocalDate): Map<LocalDate, List<DraftEvent>> {
+    fun getEvents(startDate: LocalDate, endDate: LocalDate, calendarIds: Set<Long>? = null): Map<LocalDate, List<DraftEvent>> {
         val startMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val endMillis = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
@@ -103,15 +103,20 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Instances.DISPLAY_COLOR,
             CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.EVENT_LOCATION,
-            CalendarContract.Instances.CALENDAR_DISPLAY_NAME
+            CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Instances.CALENDAR_ID
         )
 
         val eventsMap = mutableMapOf<LocalDate, MutableList<DraftEvent>>()
+        
+        val selection = calendarIds?.let { ids ->
+            if (ids.isEmpty()) "0" else "${CalendarContract.Instances.CALENDAR_ID} IN (${ids.joinToString(",")})"
+        }
 
         context.contentResolver.query(
             builder.build(),
             projection,
-            null,
+            selection,
             null,
             "${CalendarContract.Instances.BEGIN} ASC"
         )?.use { cursor ->
