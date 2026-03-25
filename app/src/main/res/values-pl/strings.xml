@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Caltastic</string>
+    <string name="calendar_settings_title">Ustawienia kalendarzy</string>
+    <string name="calendar_settings_description">Widoczne kalendarze i domyślny dla szybkich wpisów (gwiazdka)</string>
+    <string name="done_button">Gotowe</string>
+    <string name="smart_add_title">Szybkie dodawanie</string>
+    <string name="smart_add_placeholder">Np. Obiad z mamą jutro 14:00-15:30</string>
+    <string name="calendar_label">Kalendarz: %1$s</string>
+    <string name="preview_label">Podgląd:</string>
+    <string name="all_day_label">Cały dzień</string>
+    <string name="no_events_label">Brak zaplanowanych wydarzeń</string>
+    <string name="open_in_calendar">Otwórz w Kalendarzu</string>
+    <string name="calendars_content_description">Kalendarze</string>
+    <string name="default_calendar_name">Podstawowy</string>
+</resources>

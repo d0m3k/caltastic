@@ -15,10 +15,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import pl.dom3k.caltastic.R
 import pl.dom3k.caltastic.parser.DraftEvent
 import pl.dom3k.caltastic.parser.SmartAdditionParser
 import java.time.format.DateTimeFormatter
@@ -32,9 +38,14 @@ fun SmartAddInput(
 ) {
     var text by remember { mutableStateOf("") }
     val parser = remember { SmartAdditionParser() }
+    val focusRequester = remember { FocusRequester() }
 
     val draftEvent by remember(text) {
-        derivedStateOf { parser.parse(text) }
+        derivedStateOf<DraftEvent> { parser.parse(text) }
+    }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 
     Surface(
@@ -55,12 +66,12 @@ fun SmartAddInput(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Szybkie dodawanie",
+                    text = stringResource(R.string.smart_add_title),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Kalendarz: $defaultCalendarName",
+                    text = stringResource(R.string.calendar_label, defaultCalendarName),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
@@ -69,11 +80,17 @@ fun SmartAddInput(
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                placeholder = { Text("Np. Obiad z mamą jutro 14:00-15:30") },
-                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.smart_add_placeholder)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Done,
+                    capitalization = KeyboardCapitalization.Sentences,
+                    keyboardType = KeyboardType.Text
+                ),
                 keyboardActions = KeyboardActions(
                     onDone = {
                         if (draftEvent.isComplete) {
@@ -93,7 +110,7 @@ fun SmartAddInput(
                         enabled = draftEvent.isComplete,
                         modifier = Modifier.padding(end = 4.dp).size(40.dp)
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add Event")
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.smart_add_title))
                     }
                 },
                 colors = TextFieldDefaults.colors(
@@ -120,7 +137,7 @@ fun ParseDetails(draftEvent: DraftEvent, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Podgląd:",
+                text = stringResource(R.string.preview_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 8.dp)
@@ -155,7 +172,7 @@ fun ParseDetails(draftEvent: DraftEvent, modifier: Modifier = Modifier) {
             } else if (draftEvent.isAllDay) {
                 InfoChip(
                     icon = Icons.Default.Schedule,
-                    text = "Cały dzień"
+                    text = stringResource(R.string.all_day_label)
                 )
             }
         }

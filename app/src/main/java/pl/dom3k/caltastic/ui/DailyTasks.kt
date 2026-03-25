@@ -9,18 +9,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,27 +19,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import pl.dom3k.caltastic.R
 import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -72,9 +51,10 @@ fun DailyTasks(
     LazyColumn(
         state = listState,
         modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(bottom = 120.dp)
+            .fillMaxSize(),
+        contentPadding = PaddingValues(
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp
+        )
     ) {
         allDays.forEach { date ->
             val events = groupedEvents[date] ?: emptyList()
@@ -91,13 +71,13 @@ fun DailyTasks(
             }
 
             if (timedEvents.isNotEmpty()) {
-                items(timedEvents, key = { "${it.id}_${it.startTime}_${it.title}" }) { event ->
-                    val eventId = "${event.id}_${event.startTime}_${event.title}"
+                items(timedEvents, key = { "event_${it.date}_${it.instanceId ?: "${it.id}_${it.startTime}_${it.title}"}" }) { event ->
+                    val eventKey = "event_${event.date}_${event.instanceId ?: "${event.id}_${event.startTime}_${event.title}"}"
                     EventItem(
                         event = event,
-                        isExpanded = expandedEventId == eventId,
+                        isExpanded = expandedEventId == eventKey,
                         onExpandToggled = {
-                            expandedEventId = if (expandedEventId == eventId) null else eventId
+                            expandedEventId = if (expandedEventId == eventKey) null else eventKey
                         }
                     )
                 }
@@ -130,13 +110,11 @@ fun DailyTasks(
                             key.startsWith("allday_") -> key.removePrefix("allday_")
                             key.startsWith("empty_") -> key.removePrefix("empty_")
                             key.startsWith("divider_") -> key.removePrefix("divider_")
-                            else -> {
+                            key.startsWith("event_") -> {
                                 val parts = key.split("_")
-                                if (parts.size >= 2) {
-                                    // Try to see if it's a date string
-                                    parts.firstOrNull { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) }
-                                } else null
+                                if (parts.size >= 2) parts[1] else null
                             }
+                            else -> null
                         }
                         
                         if (dateStr != null) {
@@ -166,7 +144,7 @@ fun DayHeader(date: LocalDate) {
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -193,7 +171,7 @@ fun AllDayEventsRow(events: List<DraftEvent>) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        items(events) { event ->
+        items(events, key = { it.instanceId ?: "${it.id}_${it.title}" }) { event ->
             val color = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primaryContainer
             Surface(
                 color = color.copy(alpha = 0.2f),
@@ -320,7 +298,7 @@ fun EventItem(
                     ) {
                         Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Otwórz w Kalendarzu", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.open_in_calendar), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -354,7 +332,7 @@ fun EmptyDayPlaceholder() {
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(
-            "Brak zaplanowanych wydarzeń",
+            stringResource(R.string.no_events_label),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )

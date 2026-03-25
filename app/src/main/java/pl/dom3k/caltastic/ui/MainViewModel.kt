@@ -2,6 +2,11 @@ package pl.dom3k.caltastic.ui
 
 import android.app.Application
 import android.content.Context
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.CalendarContract
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,9 +34,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _defaultCalendarId = MutableStateFlow<Long?>(null)
     val defaultCalendarId: StateFlow<Long?> = _defaultCalendarId.asStateFlow()
+
+    private var currentRange: Pair<LocalDate, LocalDate>? = null
+
+    private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean, uri: Uri?) {
+            super.onChange(selfChange, uri)
+            refreshEvents()
+        }
+    }
     
     init {
         loadCalendars()
+        application.contentResolver.registerContentObserver(
+            CalendarContract.Events.CONTENT_URI,
+            true,
+            observer
+        )
+        // Also observe Instances, as changes to recurrence or colors might show up there first
+        application.contentResolver.registerContentObserver(
+            CalendarContract.Instances.CONTENT_URI,
+            true,
+            observer
+        )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        getApplication<Application>().contentResolver.unregisterContentObserver(observer)
     }
 
     private fun loadCalendars() {
@@ -40,7 +70,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _calendars.value = fetchedCalendars
             _selectedCalendarIds.value = fetchedCalendars.filter { it.isVisible }.map { it.id }.toSet()
             
-            // Try to load saved default calendar, otherwise find a sensible default
             val savedId = prefs.getLong("default_calendar_id", -1L)
             if (savedId != -1L && fetchedCalendars.any { it.id == savedId }) {
                 _defaultCalendarId.value = savedId
@@ -54,6 +83,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedCalendarIds.update { current ->
             if (current.contains(id)) current - id else current + id
         }
+        refreshEvents()
     }
 
     fun setDefaultCalendar(id: Long) {
@@ -62,12 +92,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun loadEvents(startDate: LocalDate, endDate: LocalDate) {
+        currentRange = startDate to endDate
+        refreshEvents()
+    }
+
+    private fun refreshEvents() {
+        val range = currentRange ?: return
         viewModelScope.launch {
             try {
-                val fetchedEvents = calendarRepository.getEvents(startDate, endDate)
+                val fetchedEvents = calendarRepository.getEvents(range.first, range.second)
                 _events.value = fetchedEvents
             } catch (e: Exception) {
-                // Handle missing permissions or errors
+                // Handle error
             }
         }
     }
@@ -75,11 +111,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addEvent(draftEvent: DraftEvent) {
         viewModelScope.launch {
             try {
-                val success = calendarRepository.addEvent(draftEvent, _defaultCalendarId.value)
-                if (success) {
-                    val eventDate = draftEvent.date ?: LocalDate.now()
-                    loadEvents(eventDate.minusMonths(1), eventDate.plusMonths(1))
-                }
+                calendarRepository.addEvent(draftEvent, _defaultCalendarId.value)
+                // ContentObserver will trigger refreshEvents() automatically
             } catch (e: Exception) {
                 // Handle error
             }

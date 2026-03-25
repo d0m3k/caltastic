@@ -94,6 +94,7 @@ class CalendarRepository(private val context: Context) {
         ContentUris.appendId(builder, endMillis)
 
         val projection = arrayOf(
+            CalendarContract.Instances._ID,
             CalendarContract.Instances.EVENT_ID,
             CalendarContract.Instances.TITLE,
             CalendarContract.Instances.BEGIN,
@@ -114,6 +115,7 @@ class CalendarRepository(private val context: Context) {
             null,
             "${CalendarContract.Instances.BEGIN} ASC"
         )?.use { cursor ->
+            val instanceIdIndex = cursor.getColumnIndex(CalendarContract.Instances._ID)
             val eventIdIndex = cursor.getColumnIndex(CalendarContract.Instances.EVENT_ID)
             val titleIndex = cursor.getColumnIndex(CalendarContract.Instances.TITLE)
             val beginIndex = cursor.getColumnIndex(CalendarContract.Instances.BEGIN)
@@ -125,6 +127,7 @@ class CalendarRepository(private val context: Context) {
             val calNameIndex = cursor.getColumnIndex(CalendarContract.Instances.CALENDAR_DISPLAY_NAME)
 
             while (cursor.moveToNext()) {
+                val instanceId = cursor.getLong(instanceIdIndex)
                 val eventId = cursor.getLong(eventIdIndex)
                 val title = cursor.getString(titleIndex) ?: "Szkic wydarzenia"
                 val beginMillis = cursor.getLong(beginIndex)
@@ -142,6 +145,7 @@ class CalendarRepository(private val context: Context) {
 
                 val event = DraftEvent(
                     id = eventId,
+                    instanceId = instanceId,
                     title = title,
                     date = eventDate,
                     startTime = if (isAllDay) null else startZonedDateTime.toLocalTime(),

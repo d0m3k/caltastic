@@ -5,42 +5,20 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -48,8 +26,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import pl.dom3k.caltastic.R
 import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +50,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val dayTickerListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }
+    var showSmartAdd by remember { mutableStateOf(false) }
     
     // Separate flags for each component to avoid deadlocks and unresponsiveness
     var isDailyTasksProgrammaticScroll by remember { mutableStateOf(false) }
@@ -111,22 +92,22 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 
     val onDateSelected: (LocalDate) -> Unit = { date ->
-        selectedDate = date
         scrollJob?.cancel()
+        
+        // Set flags before updating date to prevent feedback loops
+        isDailyTasksProgrammaticScroll = true
+        isDayTickerProgrammaticScroll = true
+        selectedDate = date
+        
         scrollJob = coroutineScope.launch {
             try {
-                isDailyTasksProgrammaticScroll = true
-                isDayTickerProgrammaticScroll = true
-                
                 val targetIndex = findIndexByDate(date, days, events)
-                val tickerIndex = days.indexOf(date)
+                // DayTicker handles its own animation via LaunchedEffect(selectedDate)
                 
                 if (targetIndex != -1) {
                     dailyTasksListState.animateScrollToItem(targetIndex)
                 }
-                if (tickerIndex != -1) {
-                    dayTickerListState.animateScrollToItem(tickerIndex, scrollOffset = -150)
-                }
+                // Allow time for both animations to settle
                 delay(600)
             } finally {
                 isDailyTasksProgrammaticScroll = false
@@ -138,85 +119,119 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Caltastic", fontWeight = FontWeight.Black) },
-                actions = {
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.Black) },
+                navigationIcon = {
                     IconButton(onClick = { showCalendarSettings = true }) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = "Kalendarze")
+                        Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.calendars_content_description))
                     }
                 },
-                navigationIcon = {
+                actions = {
                     TextButton(onClick = {
                         onDateSelected(today)
                     }) {
-                        Text("Dzisiaj", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = today.format(DateTimeFormatter.ofPattern("d.MM")),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             )
         },
-        bottomBar = {
-            SmartAddInput(
-                onAddEvent = { draftEvent ->
-                    viewModel.addEvent(draftEvent)
-                },
-                defaultCalendarName = calendars.find { it.id == defaultCalendarId }?.name ?: "Podstawowy"
-            )
-        }
+        floatingActionButton = {
+            if (!showSmartAdd) {
+                FloatingActionButton(
+                    onClick = { showSmartAdd = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.navigationBarsPadding()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.smart_add_title))
+                }
+            }
+        },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        Box(
+            modifier = Modifier.fillMaxSize()
         ) {
-            DayTicker(
-                days = days,
-                selectedDate = selectedDate,
-                onDateSelected = onDateSelected,
-                onDateFocused = { date ->
-                    // ticker is being scrolled by user
-                    if (!isDayTickerProgrammaticScroll && selectedDate != date) {
-                        selectedDate = date
-                        scrollJob?.cancel()
-                        scrollJob = coroutineScope.launch {
-                            try {
-                                isDailyTasksProgrammaticScroll = true
-                                val targetIndex = findIndexByDate(date, days, events)
-                                if (targetIndex != -1) {
-                                    dailyTasksListState.scrollToItem(targetIndex)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = paddingValues.calculateTopPadding())
+            ) {
+                DayTicker(
+                    days = days,
+                    selectedDate = selectedDate,
+                    onDateSelected = onDateSelected,
+                    onDateFocused = { date ->
+                        // ticker is being scrolled by user
+                        if (!isDayTickerProgrammaticScroll && selectedDate != date) {
+                            selectedDate = date
+                            scrollJob?.cancel()
+                            scrollJob = coroutineScope.launch {
+                                try {
+                                    isDailyTasksProgrammaticScroll = true
+                                    val targetIndex = findIndexByDate(date, days, events)
+                                    if (targetIndex != -1) {
+                                        dailyTasksListState.scrollToItem(targetIndex)
+                                    }
+                                    delay(50)
+                                } finally {
+                                    isDailyTasksProgrammaticScroll = false
                                 }
-                                delay(50)
-                            } finally {
-                                isDailyTasksProgrammaticScroll = false
                             }
                         }
-                    }
-                },
-                isProgrammaticScroll = isDayTickerProgrammaticScroll,
-                listState = dayTickerListState
-            )
+                    },
+                    isProgrammaticScroll = isDayTickerProgrammaticScroll,
+                    listState = dayTickerListState
+                )
 
-            DailyTasks(
-                allDays = days,
-                groupedEvents = events,
-                onVisibleDayChanged = { date ->
-                    // list is being scrolled by user
-                    if (!isDailyTasksProgrammaticScroll && selectedDate != date) {
-                        selectedDate = date
-                        scrollJob?.cancel()
-                        scrollJob = coroutineScope.launch {
-                            try {
-                                isDayTickerProgrammaticScroll = true
-                                // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
-                                delay(600) 
-                            } finally {
-                                isDayTickerProgrammaticScroll = false
+                DailyTasks(
+                    allDays = days,
+                    groupedEvents = events,
+                    onVisibleDayChanged = { date ->
+                        // list is being scrolled by user
+                        if (!isDailyTasksProgrammaticScroll && selectedDate != date) {
+                            selectedDate = date
+                            scrollJob?.cancel()
+                            scrollJob = coroutineScope.launch {
+                                try {
+                                    isDayTickerProgrammaticScroll = true
+                                    // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
+                                    delay(600) 
+                                } finally {
+                                    isDayTickerProgrammaticScroll = false
+                                }
                             }
                         }
-                    }
-                },
-                listState = dailyTasksListState,
-                isProgrammaticScroll = isDailyTasksProgrammaticScroll,
-                modifier = Modifier.weight(1f)
-            )
+                    },
+                    listState = dailyTasksListState,
+                    isProgrammaticScroll = isDailyTasksProgrammaticScroll,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (showSmartAdd) {
+                // Dimmed background to allow dismissal by clicking outside
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clickable { showSmartAdd = false }
+                )
+
+                Box(
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    SmartAddInput(
+                        onAddEvent = { draftEvent ->
+                            viewModel.addEvent(draftEvent)
+                            showSmartAdd = false
+                        },
+                        defaultCalendarName = calendars.find { it.id == defaultCalendarId }?.name ?: stringResource(R.string.default_calendar_name)
+                    )
+                }
+            }
         }
 
         if (showCalendarSettings) {
@@ -243,11 +258,11 @@ fun CalendarSettingsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ustawienia kalendarzy") },
+        title = { Text(stringResource(R.string.calendar_settings_title)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "Widoczne kalendarze i domyślny dla szybkich wpisów (gwiazdka)",
+                    stringResource(R.string.calendar_settings_description),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -284,7 +299,7 @@ fun CalendarSettingsDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Gotowe") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.done_button)) }
         }
     )
 }
