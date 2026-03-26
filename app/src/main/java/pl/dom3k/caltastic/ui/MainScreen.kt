@@ -22,7 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -37,6 +40,7 @@ import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +128,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             try {
                 // If selecting Today, use smart scroll logic
                 val targetIndex = findIndexByDate(date, days, events, smartToday = date == today)
-                
+
                 if (targetIndex != -1) {
                     dailyTasksListState.animateScrollToItem(targetIndex)
                 }
@@ -140,7 +144,23 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.Black) },
+                title = {
+                    val month = selectedDate.format(DateTimeFormatter.ofPattern("LLLL", Locale.getDefault()))
+                        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                    val year = selectedDate.year.toString()
+                    
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Normal)) {
+                                append(month)
+                            }
+                            append(" ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)) {
+                                append(year)
+                            }
+                        }
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { showCalendarSettings = true }) {
                         Icon(Icons.Default.CalendarMonth, contentDescription = stringResource(R.string.calendars_content_description))
@@ -197,6 +217,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             ) {
                 DayTicker(
                     days = days,
+                    events = events,
                     selectedDate = selectedDate,
                     onDateSelected = onDateSelected,
                     onDateFocused = { date ->
@@ -234,7 +255,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                                 try {
                                     isDayTickerProgrammaticScroll = true
                                     // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
-                                    delay(600) 
+                                    delay(600)
                                 } finally {
                                     isDayTickerProgrammaticScroll = false
                                 }

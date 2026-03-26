@@ -3,15 +3,31 @@ package pl.dom3k.caltastic.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import pl.dom3k.caltastic.parser.DraftEvent
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
@@ -26,6 +44,7 @@ import java.util.Locale
 @Composable
 fun DayTicker(
     days: List<LocalDate>,
+    events: Map<LocalDate, List<DraftEvent>>,
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
     onDateFocused: (LocalDate) -> Unit,
@@ -67,17 +86,46 @@ fun DayTicker(
         LazyRow(
             state = listState,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
+                .fillMaxWidth(), // Removed vertical padding
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp) // Explicitly set 0dp vertical
         ) {
-            itemsIndexed(days) { _, date ->
-                DayTickerItem(
-                    date = date,
-                    isSelected = date == selectedDate,
-                    onClick = { onDateSelected(date) }
-                )
+            itemsIndexed(days) { index, date ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val isNewMonth = index > 0 && date.month != days[index - 1].month
+                    val isNewWeek = index > 0 && date.dayOfWeek == DayOfWeek.MONDAY
+
+                    if (isNewMonth) {
+                        // Bigger divide between months
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 6.dp)
+                                .width(2.5.dp)
+                                .height(48.dp)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                        )
+                    } else if (isNewWeek) {
+                        // Divider between Sunday and Monday
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .width(1.dp)
+                                .height(40.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        )
+                    }
+
+                    if (index > 0) {
+                        val spacing = if (isNewMonth) 2.dp else if (isNewWeek) 4.dp else 4.dp
+                        Spacer(modifier = Modifier.width(spacing))
+                    }
+
+                    DayTickerItem(
+                        date = date,
+                        isSelected = date == selectedDate,
+                        events = events[date] ?: emptyList(),
+                        onClick = { onDateSelected(date) }
+                    )
+                }
             }
         }
     }
@@ -87,6 +135,7 @@ fun DayTicker(
 fun DayTickerItem(
     date: LocalDate,
     isSelected: Boolean,
+    events: List<DraftEvent>,
     onClick: () -> Unit
 ) {
     val dayOfWeek = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
@@ -115,17 +164,17 @@ fun DayTickerItem(
 
     Surface(
         onClick = onClick,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(16.dp),
         color = containerColor,
         tonalElevation = elevation,
         modifier = Modifier
-            .width(56.dp)
-            .height(72.dp)
+            .width(52.dp)
+            .height(100.dp) 
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxSize()
+            verticalArrangement = Arrangement.Top,
+            modifier = Modifier.fillMaxSize().padding(top = 8.dp)
         ) {
             Text(
                 text = dayOfWeek.uppercase(),
@@ -134,23 +183,67 @@ fun DayTickerItem(
                 color = contentColor.copy(alpha = if (isSelected) 1f else 0.6f),
                 fontSize = 11.sp
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = dayOfMonth,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = if (isSelected || isToday) FontWeight.Black else FontWeight.Bold,
                 color = contentColor,
-                fontSize = 20.sp
+                fontSize = 18.sp
             )
             
-            if (isToday && !isSelected) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .size(4.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Line views for events
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                val (allDay, timed) = events.partition { it.isAllDay }
+                
+                // All day indicators: stacked full width bars
+                allDay.take(3).forEach { event ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(1.5.dp))
+                            .background(
+                                event.color?.let { Color(it) } 
+                                ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            )
+                    )
+                }
+                
+                // Timed events: each on its own row, proportionally placed
+                // Show up to 5 bars total (all-day + timed)
+                val remainingSlots = (5 - allDay.size.coerceAtMost(3)).coerceAtLeast(0)
+                timed.take(remainingSlots).forEach { event ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                    ) {
+                        val startPercent = (event.startTime?.toSecondOfDay()?.toFloat() ?: 0f) / (24 * 3600f)
+                        val endPercent = (event.endTime?.toSecondOfDay()?.toFloat() ?: (event.startTime?.toSecondOfDay()?.plus(3600f) ?: 0f)) / (24 * 3600f)
+                        val durationPercent = (endPercent - startPercent).coerceIn(0.15f, 1f)
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(durationPercent)
+                                .fillMaxHeight()
+                                .align(Alignment.CenterStart)
+                                .offset(x = (40.dp) * startPercent)
+                                .clip(RoundedCornerShape(1.5.dp))
+                                .background(
+                                    event.color?.let { Color(it) } 
+                                    ?: MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                                )
+                        )
+                    }
+                }
             }
         }
     }
