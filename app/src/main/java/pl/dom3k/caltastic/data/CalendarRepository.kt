@@ -143,27 +143,62 @@ class CalendarRepository(private val context: Context) {
                 val location = cursor.getString(locIndex)
                 val calendarName = cursor.getString(calNameIndex)
                 
-                val startZonedDateTime = Instant.ofEpochMilli(beginMillis).atZone(ZoneId.systemDefault())
-                val endZonedDateTime = Instant.ofEpochMilli(endMillis).atZone(ZoneId.systemDefault())
+                val startZone = if (isAllDay) ZoneId.of("UTC") else ZoneId.systemDefault()
+                val startZonedDateTime = Instant.ofEpochMilli(beginMillis).atZone(startZone)
                 
-                val eventDate = startZonedDateTime.toLocalDate()
+                val endMillisAdjusted = if (endMillis > beginMillis) endMillis - 1 else endMillis
+                val endZonedDateTime = Instant.ofEpochMilli(endMillisAdjusted).atZone(startZone)
 
-                val event = DraftEvent(
-                    id = eventId,
-                    instanceId = instanceId,
-                    title = title,
-                    date = eventDate,
-                    startTime = if (isAllDay) null else startZonedDateTime.toLocalTime(),
-                    endTime = if (isAllDay) null else endZonedDateTime.toLocalTime(),
-                    isAllDay = isAllDay,
-                    color = color,
-                    calendarName = calendarName,
-                    location = location,
-                    description = description,
-                    originalText = title
-                )
+                val eventStartAsDate = startZonedDateTime.toLocalDate()
+                val eventEndAsDate = endZonedDateTime.toLocalDate()
+                
+                val totalDays = java.time.temporal.ChronoUnit.DAYS.between(eventStartAsDate, eventEndAsDate).toInt() + 1
+                
+                for (dayOffset in 0 until totalDays) {
+                    val currentDate = eventStartAsDate.plusDays(dayOffset.toLong())
+                    val multiDayPosition = if (totalDays > 1) (dayOffset + 1) to totalDays else null
+                    
+                    val isFirstDay = dayOffset == 0
+                    val isLastDay = dayOffset == totalDays - 1
+                    
+                    // Standardize middle days into all-day events so they natively group at the top.
+                    val eventIsAllDayForThisDay = isAllDay || (!isFirstDay && !isLastDay)
+                    
+                    val computedStartTime = when {
+                        eventIsAllDayForThisDay -> null // Handled in AllDay row
+                        isFirstDay -> startZonedDateTime.withZoneSameInstant(ZoneId.systemDefault()).toLocalTime()
+                        else -> java.time.LocalTime.MIN // Spills from yesterday, starts fully at midnight
+                    }
+                    
+                    val computedEndTime = when {
+                        eventIsAllDayForThisDay -> null
+                        isLastDay -> Instant.ofEpochMilli(endMillis).atZone(ZoneId.systemDefault()).toLocalTime()
+                        else -> java.time.LocalTime.MAX // Extends till midnight
+                    }
 
-                eventsMap.getOrPut(eventDate) { mutableListOf() }.add(event)
+                    val isSpanningStart = !eventIsAllDayForThisDay && isFirstDay && totalDays > 1
+                    val isSpanningEnd = !eventIsAllDayForThisDay && isLastDay && totalDays > 1
+                    
+                    val event = DraftEvent(
+                        id = eventId,
+                        instanceId = instanceId,
+                        title = title,
+                        date = currentDate,
+                        startTime = computedStartTime,
+                        endTime = computedEndTime,
+                        isAllDay = eventIsAllDayForThisDay,
+                        color = color,
+                        calendarName = calendarName,
+                        location = location,
+                        description = description,
+                        originalText = title,
+                        multiDayPosition = multiDayPosition,
+                        isSpanningStart = isSpanningStart,
+                        isSpanningEnd = isSpanningEnd
+                    )
+
+                    eventsMap.getOrPut(currentDate) { mutableListOf() }.add(event)
+                }
             }
         }
 

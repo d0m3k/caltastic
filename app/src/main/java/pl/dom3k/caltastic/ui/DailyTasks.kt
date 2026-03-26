@@ -306,8 +306,13 @@ fun AllDayEventsRow(events: List<DraftEvent>, isPast: Boolean = false) {
                         }
                     }
             ) {
+                val textStr = if (event.multiDayPosition != null) {
+                    "${event.title} (${event.multiDayPosition.first}/${event.multiDayPosition.second})"
+                } else {
+                    event.title
+                }
                 Text(
-                    text = event.title,
+                    text = textStr,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -342,19 +347,26 @@ fun EventItem(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.width(52.dp)) {
-                if (event.startTime != null) {
+                if (event.startTime != null && !event.isAllDay) {
+                    val startStr = if (event.isSpanningEnd) "→" else event.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))
                     Text(
-                        text = event.startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        text = startStr,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (event.endTime != null) {
+                    
+                    if (event.isSpanningStart) {
+                        Text(
+                            text = "→",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                    } else if (event.endTime != null) {
                         Text(
                             text = event.endTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.7f) 
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
                     }
                 }
@@ -373,8 +385,13 @@ fun EventItem(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                val titleStr = if (event.multiDayPosition != null) {
+                    "${event.title} (${event.multiDayPosition.first}/${event.multiDayPosition.second})"
+                } else {
+                    event.title
+                }
                 Text(
-                    text = event.title,
+                    text = titleStr,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface

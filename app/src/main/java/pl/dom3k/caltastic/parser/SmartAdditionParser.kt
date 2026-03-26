@@ -15,7 +15,10 @@ data class DraftEvent(
     val calendarName: String? = null,
     val location: String? = null,
     val description: String? = null,
-    val originalText: String = ""
+    val originalText: String = "",
+    val multiDayPosition: Pair<Int, Int>? = null,
+    val isSpanningStart: Boolean = false,
+    val isSpanningEnd: Boolean = false
 ) {
     val isComplete: Boolean
         get() = title.isNotBlank() && date != null
