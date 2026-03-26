@@ -39,17 +39,26 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.runtime.Immutable
+
+@Immutable
+data class ImmutableDays(val items: List<LocalDate>)
+
+@Immutable
+data class ImmutableEvents(val items: Map<LocalDate, List<DraftEvent>>)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DailyTasks(
-    allDays: List<LocalDate>,
-    groupedEvents: Map<LocalDate, List<DraftEvent>>,
+    allDays: ImmutableDays,
+    groupedEvents: ImmutableEvents,
     onVisibleDayChanged: (LocalDate) -> Unit,
     listState: LazyListState,
     isProgrammaticScroll: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val daysList = allDays.items
+    val eventsMap = groupedEvents.items
     var expandedEventId by remember { mutableStateOf<String?>(null) }
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     val today = LocalDate.now()
@@ -70,8 +79,8 @@ fun DailyTasks(
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp
         )
     ) {
-        allDays.forEach { date ->
-            val events = groupedEvents[date] ?: emptyList()
+        daysList.forEach { date ->
+            val events = eventsMap[date] ?: emptyList()
             val (allDayEvents, timedEvents) = events.partition { it.isAllDay }
             val isDayPast = date < today
 
@@ -149,10 +158,10 @@ fun DailyTasks(
         }
     }
     
-    LaunchedEffect(listState, allDays, isProgrammaticScroll) {
+    LaunchedEffect(listState, daysList, isProgrammaticScroll) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { _ ->
-                if (!isProgrammaticScroll && allDays.isNotEmpty()) {
+                if (!isProgrammaticScroll && daysList.isNotEmpty()) {
                     val visibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
                     val key = visibleItem?.key as? String
                     if (key != null) {

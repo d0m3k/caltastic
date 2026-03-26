@@ -88,6 +88,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         // Extended range: 1 year back, 2 years forward
         (-365..730).map { today.plusDays(it.toLong()) }
     }
+    val immutableDays = remember(days) { ImmutableDays(days) }
+    val immutableEvents = remember(events) { ImmutableEvents(events) }
     
     val isLoadingEvents by viewModel.isLoadingEvents.collectAsState()
 
@@ -274,28 +276,30 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 )
 
                 DailyTasks(
-                    allDays = days,
-                    groupedEvents = events,
-                    onVisibleDayChanged = { date ->
-                        // list is being scrolled by user
-                        if (!isDailyTasksProgrammaticScroll && selectedDate != date) {
-                            selectedDate = date
-                            scrollJob?.cancel()
-                            scrollJob = coroutineScope.launch {
-                                try {
-                                    isDayTickerProgrammaticScroll = true
-                                    // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
-                                    delay(600)
-                                } finally {
-                                    isDayTickerProgrammaticScroll = false
+                    allDays = immutableDays,
+                    groupedEvents = immutableEvents,
+                    onVisibleDayChanged = remember {
+                        { date ->
+                            // list is being scrolled by user
+                            if (!isDailyTasksProgrammaticScroll && selectedDate != date) {
+                                selectedDate = date
+                                scrollJob?.cancel()
+                                scrollJob = coroutineScope.launch {
+                                    try {
+                                        isDayTickerProgrammaticScroll = true
+                                        // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
+                                        delay(600)
+                                    } finally {
+                                        isDayTickerProgrammaticScroll = false
+                                    }
                                 }
                             }
                         }
                     },
-                        listState = dailyTasksListState,
-                        isProgrammaticScroll = isDailyTasksProgrammaticScroll,
-                        modifier = Modifier.weight(1f)
-                    )
+                    listState = dailyTasksListState,
+                    isProgrammaticScroll = isDailyTasksProgrammaticScroll,
+                    modifier = Modifier.weight(1f)
+                )
                 }
             }
 
