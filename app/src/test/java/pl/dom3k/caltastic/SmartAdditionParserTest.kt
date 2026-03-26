@@ -50,4 +50,34 @@ class SmartAdditionParserTest {
         assertEquals(LocalTime.of(12, 30), result.startTime)
         assertTrue(result.isComplete)
     }
+
+    @Test
+    fun testParseTimeNoSeparator() {
+        val result = parser.parse("Siłownia 1830")
+        
+        assertEquals("Siłownia", result.title)
+        assertEquals(LocalDate.now(), result.date)
+        assertEquals(LocalTime.of(18, 30), result.startTime)
+        assertTrue(result.isComplete)
+    }
+
+    @Test
+    fun testParseTimeNoSeparatorWithDate() {
+        val result = parser.parse("Spotkanie jutro 1000")
+        
+        assertEquals("Spotkanie", result.title)
+        assertEquals(LocalDate.now().plusDays(1), result.date)
+        assertEquals(LocalTime.of(10, 0), result.startTime)
+        assertTrue(result.isComplete)
+    }
+
+    @Test
+    fun testParseCaseInsensitiveAndSpaces() {
+        val result = parser.parse("  JUTRO   Kino   20:00  ")
+        
+        assertEquals("Kino", result.title)
+        assertEquals(LocalDate.now().plusDays(1), result.date)
+        assertEquals(LocalTime.of(20, 0), result.startTime)
+        assertTrue(result.isComplete)
+    }
 }

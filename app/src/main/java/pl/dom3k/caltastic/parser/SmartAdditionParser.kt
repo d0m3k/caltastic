@@ -61,6 +61,20 @@ class SmartAdditionParser {
             }
         }
 
+        // Time parsing HHmm (e.g., 1030) - only if startTime not found yet
+        if (startTime == null) {
+            val timeRegexNoSeparator = """\b(\d{1,2})(\d{2})\b""".toRegex()
+            timeRegexNoSeparator.find(title)?.let { match ->
+                val hour = match.groupValues[1].toInt()
+                val minute = match.groupValues[2].toInt()
+                if (hour in 0..23 && minute in 0..59) {
+                    startTime = LocalTime.of(hour, minute)
+                    title = title.replace(match.value, "")
+                    if (date == null) date = LocalDate.now()
+                }
+            }
+        }
+
         // Date parsing dd.MM
         val dateRegex = """(\d{1,2})\.(\d{2})""".toRegex()
         dateRegex.find(title)?.let { match ->

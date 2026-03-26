@@ -1,7 +1,9 @@
 package pl.dom3k.caltastic.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.CalendarContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
@@ -157,13 +160,28 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         },
         floatingActionButton = {
             if (!showSmartAdd) {
-                FloatingActionButton(
-                    onClick = { showSmartAdd = true },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.navigationBarsPadding()
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.smart_add_title))
+                    SmallFloatingActionButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW).setData(CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build())
+                            context.startActivity(intent)
+                        },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.open_in_calendar), modifier = Modifier.size(18.dp))
+                    }
+                    FloatingActionButton(
+                        onClick = { showSmartAdd = true },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.smart_add_title))
+                    }
                 }
             }
         },

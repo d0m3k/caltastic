@@ -17,9 +17,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notes
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -235,7 +235,7 @@ fun DayHeader(date: LocalDate, isPast: Boolean = false) {
             Text(
                 text = dayName,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -277,7 +277,7 @@ fun AllDayEventsRow(events: List<DraftEvent>, isPast: Boolean = false) {
                 Text(
                     text = event.title,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     maxLines = 1
                 )
@@ -314,7 +314,7 @@ fun EventItem(
                     Text(
                         text = event.startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isCurrent) FontWeight.Black else FontWeight.Bold,
+                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                         color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                     if (event.endTime != null) {
@@ -344,7 +344,7 @@ fun EventItem(
                 Text(
                     text = event.title,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
                 if (event.calendarName != null) {
@@ -372,7 +372,7 @@ fun EventItem(
                     DetailRow(Icons.Default.LocationOn, event.location)
                 }
                 if (!event.description.isNullOrBlank()) {
-                    DetailRow(Icons.Default.Notes, event.description)
+                    DetailRow(Icons.AutoMirrored.Filled.Notes, event.description)
                 }
                 
                 if (event.id != null) {
@@ -390,7 +390,7 @@ fun EventItem(
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(stringResource(R.string.open_in_calendar), style = MaterialTheme.typography.labelLarge)
                     }
