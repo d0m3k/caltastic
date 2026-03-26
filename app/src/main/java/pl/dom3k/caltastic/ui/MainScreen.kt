@@ -8,15 +8,46 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -58,9 +89,15 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         (-365..730).map { today.plusDays(it.toLong()) }
     }
     
+    val isLoadingEvents by viewModel.isLoadingEvents.collectAsState()
+
     var selectedDate by remember { mutableStateOf(today) }
-    val dailyTasksListState = rememberLazyListState()
-    val dayTickerListState = rememberLazyListState()
+    val dailyTasksListState = remember(isLoadingEvents) {
+        androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = if (isLoadingEvents) 1095 else findIndexByDate(today, days, events, smartToday = true))
+    }
+    val dayTickerListState = remember(isLoadingEvents) {
+        androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = maxOf(0, days.indexOf(today) - 2))
+    }
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }
     var showSmartAdd by remember { mutableStateOf(false) }
@@ -90,6 +127,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         val readGranted = permissions[Manifest.permission.READ_CALENDAR] ?: false
         if (readGranted) {
             viewModel.loadEvents(today.minusYears(1), today.plusYears(2))
+        } else {
+            viewModel.setEventsLoading(false)
         }
     }
 
@@ -97,23 +136,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
             viewModel.loadEvents(today.minusYears(1), today.plusYears(2))
         } else {
+            viewModel.setEventsLoading(false)
             permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
-        }
-    }
-
-    // Scroll to today on first load
-    var initialScrollDone by remember { mutableStateOf(false) }
-    LaunchedEffect(events) {
-        if (!initialScrollDone && days.isNotEmpty() && events.isNotEmpty()) {
-            delay(300) // Ensure layout is settled
-            val targetIndex = findIndexByDate(today, days, events, smartToday = true)
-            if (targetIndex != -1) {
-                isDailyTasksProgrammaticScroll = true
-                dailyTasksListState.scrollToItem(targetIndex)
-                delay(100)
-                isDailyTasksProgrammaticScroll = false
-                initialScrollDone = true
-            }
         }
     }
 
@@ -216,11 +240,16 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                     .fillMaxSize()
                     .padding(top = paddingValues.calculateTopPadding())
             ) {
-                DayTicker(
-                    days = days,
-                    events = events,
-                    selectedDate = selectedDate,
-                    onDateSelected = onDateSelected,
+                if (isLoadingEvents) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    DayTicker(
+                        days = days,
+                        events = events,
+                        selectedDate = selectedDate,
+                        onDateSelected = onDateSelected,
                     onDateFocused = { date ->
                         // ticker is being scrolled by user
                         if (!isDayTickerProgrammaticScroll && selectedDate != date) {
@@ -263,10 +292,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                             }
                         }
                     },
-                    listState = dailyTasksListState,
-                    isProgrammaticScroll = isDailyTasksProgrammaticScroll,
-                    modifier = Modifier.weight(1f)
-                )
+                        listState = dailyTasksListState,
+                        isProgrammaticScroll = isDailyTasksProgrammaticScroll,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             if (showSmartAdd) {

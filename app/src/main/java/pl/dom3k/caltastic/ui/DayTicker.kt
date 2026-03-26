@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +54,12 @@ fun DayTicker(
     listState: LazyListState = rememberLazyListState()
 ) {
     // Scroll to the selected date if it changes externally (e.g. from DailyTasks scroll)
+    var isTickerFirstLaunch by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     LaunchedEffect(selectedDate) {
+        if (isTickerFirstLaunch) {
+            isTickerFirstLaunch = false
+            return@LaunchedEffect
+        }
         if (!listState.isScrollInProgress) {
             val index = days.indexOf(selectedDate)
             if (index >= 0) {

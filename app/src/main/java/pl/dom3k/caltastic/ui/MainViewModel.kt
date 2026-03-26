@@ -18,6 +18,7 @@ import pl.dom3k.caltastic.data.CalendarInfo
 import pl.dom3k.caltastic.data.CalendarRepository
 import pl.dom3k.caltastic.parser.DraftEvent
 import java.time.LocalDate
+import androidx.core.content.edit
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val calendarRepository = CalendarRepository(application)
@@ -25,6 +26,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     private val _events = MutableStateFlow<Map<LocalDate, List<DraftEvent>>>(emptyMap())
     val events: StateFlow<Map<LocalDate, List<DraftEvent>>> = _events.asStateFlow()
+
+    private val _isLoadingEvents = MutableStateFlow(true)
+    val isLoadingEvents: StateFlow<Boolean> = _isLoadingEvents.asStateFlow()
 
     private val _calendars = MutableStateFlow<List<CalendarInfo>>(emptyList())
     val calendars: StateFlow<List<CalendarInfo>> = _calendars.asStateFlow()
@@ -36,6 +40,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val defaultCalendarId: StateFlow<Long?> = _defaultCalendarId.asStateFlow()
 
     private var currentRange: Pair<LocalDate, LocalDate>? = null
+
+    fun setEventsLoading(loading: Boolean) {
+        _isLoadingEvents.value = loading
+    }
 
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
@@ -91,7 +99,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleCalendar(id: Long) {
         _selectedCalendarIds.update { current ->
             val newSet = if (current.contains(id)) current - id else current + id
-            prefs.edit().putStringSet("selected_calendar_ids", newSet.map { it.toString() }.toSet()).apply()
+            prefs.edit {
+                putStringSet(
+                    "selected_calendar_ids",
+                    newSet.map { it.toString() }.toSet()
+                )
+            }
             newSet
         }
         refreshEvents()
@@ -99,11 +112,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDefaultCalendar(id: Long) {
         _defaultCalendarId.value = id
-        prefs.edit().putLong("default_calendar_id", id).apply()
+        prefs.edit { putLong("default_calendar_id", id) }
     }
     
     fun loadEvents(startDate: LocalDate, endDate: LocalDate) {
         currentRange = startDate to endDate
+        _isLoadingEvents.value = true
         refreshEvents()
     }
 
@@ -115,6 +129,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _events.value = fetchedEvents
             } catch (e: Exception) {
                 // Handle error
+            } finally {
+                _isLoadingEvents.value = false
             }
         }
     }
