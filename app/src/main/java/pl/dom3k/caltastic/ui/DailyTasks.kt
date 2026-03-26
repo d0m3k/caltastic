@@ -54,12 +54,10 @@ fun DailyTasks(
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     val today = LocalDate.now()
 
-    // Precise minute-aligned update logic for zero-latency event transitions
     LaunchedEffect(Unit) {
         while (true) {
             val now = LocalTime.now()
             currentTime = now
-            // Calculate delay until the exact start of the next minute
             val millisUntilNextMinute = (60 - now.second) * 1000L - (now.nano / 1_000_000L)
             delay(millisUntilNextMinute.coerceAtLeast(1))
         }
@@ -67,8 +65,7 @@ fun DailyTasks(
 
     LazyColumn(
         state = listState,
-        modifier = modifier
-            .fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp
         )
@@ -152,7 +149,6 @@ fun DailyTasks(
         }
     }
     
-    // Sync logic: DailyTasks scroll -> DayTicker selection
     LaunchedEffect(listState, allDays, isProgrammaticScroll) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { _ ->

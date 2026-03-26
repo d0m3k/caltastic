@@ -54,7 +54,8 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
     val today = LocalDate.now()
     val days = remember {
-        (-30..90).map { today.plusDays(it.toLong()) }
+        // Extended range: 1 year back, 2 years forward
+        (-365..730).map { today.plusDays(it.toLong()) }
     }
     
     var selectedDate by remember { mutableStateOf(today) }
@@ -88,13 +89,13 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     ) { permissions ->
         val readGranted = permissions[Manifest.permission.READ_CALENDAR] ?: false
         if (readGranted) {
-            viewModel.loadEvents(today.minusMonths(1), today.plusMonths(3))
+            viewModel.loadEvents(today.minusYears(1), today.plusYears(2))
         }
     }
 
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
-            viewModel.loadEvents(today.minusMonths(1), today.plusMonths(3))
+            viewModel.loadEvents(today.minusYears(1), today.plusYears(2))
         } else {
             permissionLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
         }

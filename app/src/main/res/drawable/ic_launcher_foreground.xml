@@ -4,33 +4,22 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Calendar Body -->
+    <!-- Calendar Body with soft corners - clean centered look -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M24,30 H84 V84 Q84,88 80,88 H28 Q24,88 24,84 Z" />
+        android:pathData="M30,36 C30,33 32,31 35,31 H73 C76,31 78,33 78,36 V72 C78,75 76,77 73,77 H35 C32,77 30,75 30,72 Z" />
 
-    <!-- Calendar Top Header -->
+    <!-- Modern Header strip -->
     <path
-        android:fillColor="#F44336"
-        android:pathData="M24,24 Q24,20 28,20 H80 Q84,20 84,24 V34 H24 Z" />
+        android:fillColor="#FF5252"
+        android:pathData="M30,36 C30,33 32,31 35,31 H73 C76,31 78,33 78,36 V42 H30 Z" />
 
-    <!-- Calendar Rings/Bindings -->
-    <path
-        android:fillColor="#455A64"
-        android:pathData="M34,16 H38 V24 H34 Z M70,16 H74 V24 H70 Z" />
-
-    <!-- Calendar Grid/Dots (Fantastic/Abstract) -->
-    <group android:translateX="32" android:translateY="42">
-        <path android:fillColor="#E0E0E0" android:pathData="M0,0 H10 V10 H0 Z M18,0 H28 V10 H18 Z M36,0 H46 V10 H36 Z" />
-        <path android:fillColor="#E0E0E0" android:pathData="M0,18 H10 V28 H0 Z M18,18 H28 V28 H18 Z" />
+    <!-- Minimalist grid dots -->
+    <group android:translateX="38" android:translateY="50">
+        <path android:fillColor="#F0F0F0" android:pathData="M0,0h8v8h-8z M12,0h8v8h-8z M24,0h8v8h-8z" />
+        <path android:fillColor="#F0F0F0" android:pathData="M0,12h8v8h-8z M12,12h8v8h-8z" />
         <!-- Highlighted 'Fantastic' Day -->
-        <path android:fillColor="#FFC107" android:pathData="M36,18 H46 V28 H36 Z" />
-        <path android:fillColor="#E0E0E0" android:pathData="M0,36 H10 V46 H0 Z M18,36 H28 V46 H18 Z M36,36 H46 V46 H36 Z" />
+        <path android:fillColor="#FFC107" android:pathData="M24,12h8v8h-8z" />
     </group>
-
-    <!-- 'Fantastic' Sparkle -->
-    <path
-        android:fillColor="#FFD54F"
-        android:pathData="M88,15 L90,21 L96,23 L90,25 L88,31 L86,25 L80,23 L86,21 Z" />
 
 </vector>
