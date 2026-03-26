@@ -54,8 +54,8 @@ fun DailyTasks(
     groupedEvents: ImmutableEvents,
     onVisibleDayChanged: (LocalDate) -> Unit,
     listState: LazyListState,
-    isProgrammaticScroll: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onScrollProgress: ((Float) -> Unit)? = null
 ) {
     val daysList = allDays.items
     val eventsMap = groupedEvents.items
@@ -158,39 +158,66 @@ fun DailyTasks(
         }
     }
     
-    LaunchedEffect(listState, daysList, isProgrammaticScroll) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { _ ->
-                if (!isProgrammaticScroll && daysList.isNotEmpty()) {
-                    val visibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
-                    val key = visibleItem?.key as? String
-                    if (key != null) {
-                        val dateStr = when {
-                            key.startsWith("header_") -> key.removePrefix("header_")
-                            key.startsWith("allday_") -> key.removePrefix("allday_")
-                            key.startsWith("empty_") -> key.removePrefix("empty_")
-                            key.startsWith("divider_") -> key.removePrefix("divider_")
-                            key.startsWith("time_indicator") -> {
-                                val parts = key.split("_")
-                                if (parts.size >= 3) parts[2] else null
-                            }
-                            key.startsWith("event_") -> {
-                                val parts = key.split("_")
-                                if (parts.size >= 2) parts[1] else null
-                            }
-                            else -> null
-                        }
-                        
-                        if (dateStr != null) {
-                            try {
-                                val date = LocalDate.parse(dateStr)
-                                onVisibleDayChanged(date)
-                            } catch (e: Exception) {
-                            }
-                        }
+    val itemHeights = androidx.compose.runtime.remember(daysList, eventsMap) {
+        val heights = mutableListOf<Float>()
+        val today = LocalDate.now()
+        for (day in daysList) {
+            heights.add(40f) // Header
+            val dayEvents = eventsMap[day] ?: emptyList()
+            val (allDay, timed) = dayEvents.partition { it.isAllDay }
+            if (allDay.isNotEmpty()) heights.add(40f)
+            timed.forEach { _ -> heights.add(60f) }
+            if (dayEvents.isEmpty()) heights.add(40f)
+            if (day == today) heights.add(2f)
+            heights.add(1f) // Divider
+        }
+        heights.toFloatArray()
+    }
+
+    val dayStartIndices = androidx.compose.runtime.remember(daysList, eventsMap) {
+        val indices = IntArray(daysList.size + 1)
+        var current = 0
+        for (i in daysList.indices) {
+            indices[i] = current
+            current += calculateItemsForDay(daysList[i], eventsMap)
+        }
+        indices[daysList.size] = current
+        indices
+    }
+
+    LaunchedEffect(listState, daysList) {
+        snapshotFlow { 
+            val idx = listState.firstVisibleItemIndex
+            val off = listState.firstVisibleItemScrollOffset
+            val h = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 1
+            Triple(idx, off, h)
+        }.collect { (firstVisibleItem, offset, itemHeight) ->
+            if (daysList.isNotEmpty()) {
+                var dayIndex = dayStartIndices.binarySearch(firstVisibleItem)
+                if (dayIndex < 0) dayIndex = -dayIndex - 2
+                
+                if (dayIndex >= 0 && dayIndex < daysList.size) {
+                    val date = daysList[dayIndex]
+                    onVisibleDayChanged(date)
+                    
+                    var totalHeight = 0f
+                    var accumulated = 0f
+                    val startIdx = dayStartIndices[dayIndex]
+                    val endIdx = dayStartIndices[dayIndex + 1]
+                    for (i in startIdx until endIdx) {
+                        val h = itemHeights.getOrElse(i) { 50f }
+                        totalHeight += h
+                        if (i < firstVisibleItem) accumulated += h
                     }
+                    
+                    // Normalize the exact current item's pixel offset relatively
+                    val pixelOffset = offset.toFloat().coerceAtMost(itemHeights.getOrElse(firstVisibleItem) { itemHeight.toFloat() })
+                    val fraction = (accumulated + pixelOffset) / totalHeight.coerceAtLeast(1f)
+                    
+                    onScrollProgress?.invoke(dayIndex + fraction)
                 }
             }
+        }
     }
 }
 

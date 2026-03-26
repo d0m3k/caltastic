@@ -27,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,30 +48,12 @@ fun DayTicker(
     selectedDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
     onDateFocused: (LocalDate) -> Unit,
-    isProgrammaticScroll: Boolean,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState()
 ) {
-    // Scroll to the selected date if it changes externally (e.g. from DailyTasks scroll)
-    var isTickerFirstLaunch by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    LaunchedEffect(selectedDate) {
-        if (isTickerFirstLaunch) {
-            isTickerFirstLaunch = false
-            return@LaunchedEffect
-        }
-        if (!listState.isScrollInProgress) {
-            val index = days.indexOf(selectedDate)
-            if (index >= 0) {
-                // Offset to center the selected date roughly at the 2nd position
-                listState.animateScrollToItem(index, scrollOffset = -150)
-            }
-        }
-    }
-
     // Report "focused" date (item at a certain offset) when user scrolls the ticker
-    // We restart this effect if isProgrammaticScroll changes to correctly suppress sync-back
-    LaunchedEffect(listState.isScrollInProgress, isProgrammaticScroll) {
-        if (listState.isScrollInProgress && !isProgrammaticScroll) {
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
             snapshotFlow { listState.firstVisibleItemIndex }
                 .collect { firstVisible ->
                     // Focus on the 2nd visible item if available to match the offset used in animateScrollToItem

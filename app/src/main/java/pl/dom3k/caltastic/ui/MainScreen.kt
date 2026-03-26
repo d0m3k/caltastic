@@ -64,7 +64,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import pl.dom3k.caltastic.R
 import pl.dom3k.caltastic.parser.DraftEvent
@@ -77,6 +76,7 @@ import java.util.Locale
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val events by viewModel.events.collectAsState()
     val calendars by viewModel.calendars.collectAsState()
@@ -103,12 +103,6 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }
     var showSmartAdd by remember { mutableStateOf(false) }
-    
-    // Separate flags for each component to avoid deadlocks and unresponsiveness
-    var isDailyTasksProgrammaticScroll by remember { mutableStateOf(false) }
-    var isDayTickerProgrammaticScroll by remember { mutableStateOf(false) }
-    
-    var scrollJob by remember { mutableStateOf<Job?>(null) }
 
     // Listen to lifecycle changes to refresh data when app is reopened
     DisposableEffect(lifecycleOwner) {
@@ -144,26 +138,11 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     }
 
     val onDateSelected: (LocalDate) -> Unit = { date ->
-        scrollJob?.cancel()
-        
-        // Set flags before updating date to prevent feedback loops
-        isDailyTasksProgrammaticScroll = true
-        isDayTickerProgrammaticScroll = true
         selectedDate = date
-        
-        scrollJob = coroutineScope.launch {
-            try {
-                // If selecting Today, use smart scroll logic
-                val targetIndex = findIndexByDate(date, days, events, smartToday = date == today)
-
-                if (targetIndex != -1) {
-                    dailyTasksListState.animateScrollToItem(targetIndex)
-                }
-                // Allow time for both animations to settle
-                delay(600)
-            } finally {
-                isDailyTasksProgrammaticScroll = false
-                isDayTickerProgrammaticScroll = false
+        coroutineScope.launch {
+            val targetIndex = findIndexByDate(date, days, events, smartToday = date == today)
+            if (targetIndex != -1) {
+                dailyTasksListState.animateScrollToItem(targetIndex)
             }
         }
     }
@@ -254,52 +233,48 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         onDateSelected = onDateSelected,
                     onDateFocused = { date ->
                         // ticker is being scrolled by user
-                        if (!isDayTickerProgrammaticScroll && selectedDate != date) {
+                        if (selectedDate != date) {
                             selectedDate = date
-                            scrollJob?.cancel()
-                            scrollJob = coroutineScope.launch {
-                                try {
-                                    isDailyTasksProgrammaticScroll = true
-                                    val targetIndex = findIndexByDate(date, days, events)
-                                    if (targetIndex != -1) {
-                                        dailyTasksListState.scrollToItem(targetIndex)
-                                    }
-                                    delay(50)
-                                } finally {
-                                    isDailyTasksProgrammaticScroll = false
+                            coroutineScope.launch {
+                                val targetIndex = findIndexByDate(date, days, events)
+                                if (targetIndex != -1) {
+                                    dailyTasksListState.scrollToItem(targetIndex)
                                 }
                             }
                         }
                     },
-                    isProgrammaticScroll = isDayTickerProgrammaticScroll,
                     listState = dayTickerListState
                 )
 
-                DailyTasks(
-                    allDays = immutableDays,
-                    groupedEvents = immutableEvents,
-                    onVisibleDayChanged = remember {
-                        { date ->
-                            // list is being scrolled by user
-                            if (!isDailyTasksProgrammaticScroll && selectedDate != date) {
-                                selectedDate = date
-                                scrollJob?.cancel()
-                                scrollJob = coroutineScope.launch {
-                                    try {
-                                        isDayTickerProgrammaticScroll = true
-                                        // DayTicker handles its own scroll to selectedDate in its LaunchedEffect(selectedDate)
-                                        delay(600)
-                                    } finally {
-                                        isDayTickerProgrammaticScroll = false
+                    DailyTasks(
+                        allDays = immutableDays,
+                        groupedEvents = immutableEvents,
+                        onVisibleDayChanged = remember {
+                            { date ->
+                                if (selectedDate != date) {
+                                    selectedDate = date
+                                }
+                            }
+                        },
+                        listState = dailyTasksListState,
+                        modifier = Modifier.weight(1f),
+                        onScrollProgress = remember {
+                            val jobHolder = object { var job: Job? = null }
+                            { fractionalDay: Float ->
+                                if (!dayTickerListState.isScrollInProgress) {
+                                    val dayIndex = fractionalDay.toInt()
+                                    val fraction = fractionalDay - dayIndex
+                                    val tickerItemWidthPx = with(density) { 56.dp.toPx() }
+                                    val extraOffset = (fraction * tickerItemWidthPx).toInt()
+                                    // Cancel any previous racing scroll updates
+                                    jobHolder.job?.cancel()
+                                    jobHolder.job = coroutineScope.launch {
+                                        dayTickerListState.scrollToItem(dayIndex, -150 + extraOffset)
                                     }
                                 }
                             }
                         }
-                    },
-                    listState = dailyTasksListState,
-                    isProgrammaticScroll = isDailyTasksProgrammaticScroll,
-                    modifier = Modifier.weight(1f)
-                )
+                    )
                 }
             }
 
