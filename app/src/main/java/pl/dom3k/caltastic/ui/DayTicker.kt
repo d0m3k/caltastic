@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,15 +55,32 @@ fun DayTicker(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState()
 ) {
+    var isUserScrolling by remember { mutableStateOf(false) }
+    val isDragged by listState.interactionSource.collectIsDraggedAsState()
+
+    LaunchedEffect(isDragged) {
+        if (isDragged) {
+            isUserScrolling = true
+        }
+    }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            isUserScrolling = false
+        }
+    }
+
     // Report "focused" date (item at a certain offset) when user scrolls the ticker
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress) {
             snapshotFlow { listState.firstVisibleItemIndex }
                 .collect { firstVisible ->
-                    // Focus on the 2nd visible item if available to match the offset used in animateScrollToItem
-                    val focusIndex = (firstVisible + 1).coerceAtMost(days.size - 1)
-                    if (focusIndex >= 0 && focusIndex < days.size) {
-                        onDateFocused(days[focusIndex])
+                    if (isUserScrolling) {
+                        // Focus on the 2nd visible item if available to match the offset used in animateScrollToItem
+                        val focusIndex = (firstVisible + 1).coerceAtMost(days.size - 1)
+                        if (focusIndex >= 0 && focusIndex < days.size) {
+                            onDateFocused(days[focusIndex])
+                        }
                     }
                 }
         }

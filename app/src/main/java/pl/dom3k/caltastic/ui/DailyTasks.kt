@@ -161,15 +161,9 @@ fun DailyTasks(
     val itemHeights = androidx.compose.runtime.remember(daysList, eventsMap) {
         val heights = mutableListOf<Float>()
         val today = LocalDate.now()
+        val currentTime = LocalTime.now()
         for (day in daysList) {
-            heights.add(40f) // Header
-            val dayEvents = eventsMap[day] ?: emptyList()
-            val (allDay, timed) = dayEvents.partition { it.isAllDay }
-            if (allDay.isNotEmpty()) heights.add(40f)
-            timed.forEach { _ -> heights.add(60f) }
-            if (dayEvents.isEmpty()) heights.add(40f)
-            if (day == today) heights.add(2f)
-            heights.add(1f) // Divider
+            heights.addAll(getDayItemHeights(day, eventsMap[day] ?: emptyList(), today, currentTime))
         }
         heights.toFloatArray()
     }

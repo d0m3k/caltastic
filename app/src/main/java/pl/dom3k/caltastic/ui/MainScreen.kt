@@ -94,15 +94,26 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val isLoadingEvents by viewModel.isLoadingEvents.collectAsState()
 
     var selectedDate by remember { mutableStateOf(today) }
-    val dailyTasksListState = remember(isLoadingEvents) {
-        androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = if (isLoadingEvents) 1095 else findIndexByDate(today, days, events, smartToday = true))
-    }
-    val dayTickerListState = remember(isLoadingEvents) {
-        androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = maxOf(0, days.indexOf(today) - 2))
-    }
+    val dailyTasksListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val dayTickerListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }
     var showSmartAdd by remember { mutableStateOf(false) }
+
+    var hasInitialScrolled by remember { mutableStateOf(false) }
+    LaunchedEffect(isLoadingEvents, events) {
+        if (!isLoadingEvents && !hasInitialScrolled) {
+            val targetIndex = findIndexByDate(today, days, events, smartToday = true)
+            if (targetIndex != -1) {
+                dailyTasksListState.scrollToItem(targetIndex)
+            }
+            val tickerTargetIndex = maxOf(0, days.indexOf(today) - 2)
+            if (tickerTargetIndex != -1) {
+                dayTickerListState.scrollToItem(tickerTargetIndex)
+            }
+            hasInitialScrolled = true
+        }
+    }
 
     // Listen to lifecycle changes to refresh data when app is reopened
     DisposableEffect(lifecycleOwner) {
@@ -371,6 +382,54 @@ fun CalendarSettingsDialog(
     )
 }
 
+fun getDayItemHeights(
+    date: LocalDate,
+    events: List<DraftEvent>,
+    today: LocalDate = LocalDate.now(),
+    currentTime: LocalTime = LocalTime.now()
+): List<Float> {
+    val heights = mutableListOf<Float>()
+    heights.add(40f) // Header
+
+    val (allDayEvents, timedEvents) = events.partition { it.isAllDay }
+    if (allDayEvents.isNotEmpty()) {
+        heights.add(40f) // AllDayEventsRow
+    }
+
+    if (timedEvents.isNotEmpty()) {
+        val sortedEvents = timedEvents.sortedBy { it.startTime }
+        sortedEvents.forEachIndexed { index, event ->
+            if (date == today) {
+                val prevEvent = if (index > 0) sortedEvents[index - 1] else null
+                val shouldShowIndicatorBefore = when {
+                    index == 0 && event.startTime?.let { it > currentTime } == true -> true
+                    prevEvent != null && prevEvent.endTime?.let { it < currentTime } == true && event.startTime?.let { it > currentTime } == true -> true
+                    else -> false
+                }
+                if (shouldShowIndicatorBefore) {
+                    heights.add(2f) // TimeIndicatorRow
+                }
+            }
+
+            heights.add(60f) // EventItem
+
+            if (date == today && index == sortedEvents.size - 1 && event.endTime?.let { it < currentTime } == true) {
+                heights.add(2f) // TimeIndicatorRow
+            }
+        }
+    } else {
+        if (allDayEvents.isEmpty()) {
+            heights.add(40f) // EmptyDayPlaceholder
+        }
+        if (date == today) {
+            heights.add(2f) // TimeIndicatorRow
+        }
+    }
+
+    heights.add(1f) // Divider
+    return heights
+}
+
 fun findIndexByDate(
     targetDate: LocalDate,
     allDays: List<LocalDate>,
@@ -386,6 +445,7 @@ fun findIndexByDate(
             if (smartToday && date == today) {
                 // Smart scroll for Today
                 val dayEvents = events[date] ?: emptyList()
+                val heights = getDayItemHeights(date, dayEvents, today, currentTime)
                 val (allDay, timed) = dayEvents.partition { it.isAllDay }
                 val sortedTimed = timed.sortedBy { it.startTime }
 
@@ -400,22 +460,29 @@ fun findIndexByDate(
                     }
                 }
 
-                return if (firstNonPastIndex != -1) {
-                    // Start with Header
+                if (firstNonPastIndex != -1) {
                     var offset = 1 
                     if (allDay.isNotEmpty()) offset++ // AllDayRow
                     
-                    // We want to scroll to "current/indicator minus one event"
-                    // If firstNonPastIndex is 0, we just scroll to header (offset 0 relative to day start)
-                    // If it's > 0, we scroll to the event before it.
-                    
                     if (firstNonPastIndex > 0) {
-                        currentIndex + offset + (firstNonPastIndex - 1)
+                        var itemIdx = offset
+                        for (i in 0 until firstNonPastIndex) {
+                            val event = sortedTimed[i]
+                            val prevEvent = if (i > 0) sortedTimed[i - 1] else null
+                            val shouldShowIndicatorBefore = when {
+                                i == 0 && event.startTime?.let { it > currentTime } == true -> true
+                                prevEvent != null && prevEvent.endTime?.let { it < currentTime } == true && event.startTime?.let { it > currentTime } == true -> true
+                                else -> false
+                            }
+                            if (shouldShowIndicatorBefore) itemIdx++
+                            itemIdx++
+                        }
+                        return currentIndex + (itemIdx - 1)
                     } else {
-                        currentIndex // Just top of Today
+                        return currentIndex // Just top of Today
                     }
                 } else {
-                    currentIndex // Just top of Today
+                    return currentIndex // Just top of Today
                 }
             }
             return currentIndex
@@ -426,18 +493,5 @@ fun findIndexByDate(
 }
 
 fun calculateItemsForDay(date: LocalDate, events: Map<LocalDate, List<DraftEvent>>): Int {
-    var count = 1 // Header
-    val dayEvents = events[date] ?: emptyList()
-    val (allDay, timed) = dayEvents.partition { it.isAllDay }
-    val isToday = date == LocalDate.now()
-    
-    if (allDay.isNotEmpty()) count++ // AllDayRow
-    count += timed.size // Timed items
-    if (dayEvents.isEmpty()) count++ // Empty placeholder
-    
-    // Account for TimeIndicatorRow on today
-    if (isToday) count++ 
-
-    count++ // Divider
-    return count
+    return getDayItemHeights(date, events[date] ?: emptyList()).size
 }
