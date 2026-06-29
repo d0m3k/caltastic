@@ -3,9 +3,6 @@ package pl.dom3k.caltastic.ui
 import android.content.ContentUris
 import android.content.Intent
 import android.provider.CalendarContract
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,8 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,7 +54,6 @@ fun DailyTasks(
 ) {
     val daysList = allDays.items
     val eventsMap = groupedEvents.items
-    var expandedEventId by remember { mutableStateOf<String?>(null) }
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     val today = LocalDate.now()
 
@@ -117,15 +111,10 @@ fun DailyTasks(
                     }
 
                     item(key = "event_${event.date}_${event.instanceId ?: "${event.id}_${event.startTime}_${event.title}"}") {
-                        val eventKey = "event_${event.date}_${event.instanceId ?: "${event.id}_${event.startTime}_${event.title}"}"
                         EventItem(
                             event = event,
-                            isExpanded = expandedEventId == eventKey,
                             isPast = isPast,
-                            isCurrent = isCurrent,
-                            onExpandToggled = {
-                                expandedEventId = if (expandedEventId == eventKey) null else eventKey
-                            }
+                            isCurrent = isCurrent
                         )
                     }
                     
@@ -320,10 +309,8 @@ fun AllDayEventsRow(events: List<DraftEvent>, isPast: Boolean = false) {
 @Composable
 fun EventItem(
     event: DraftEvent,
-    isExpanded: Boolean,
     isPast: Boolean = false,
-    isCurrent: Boolean = false,
-    onExpandToggled: () -> Unit
+    isCurrent: Boolean = false
 ) {
     val eventColor = event.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary
     val context = LocalContext.current
@@ -335,7 +322,13 @@ fun EventItem(
         modifier = Modifier
             .fillMaxWidth()
             .background(containerColor)
-            .clickable { onExpandToggled() }
+            .clickable {
+                event.id?.let { id ->
+                    val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id)
+                    val intent = Intent(Intent.ACTION_VIEW).setData(uri)
+                    context.startActivity(intent)
+                }
+            }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .alpha(surfaceAlpha)
     ) {
@@ -390,74 +383,42 @@ fun EventItem(
                     fontWeight = if (isCurrent) FontWeight.Medium else FontWeight.Normal,
                     color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
-                if (event.calendarName != null) {
-                    Text(
-                        text = event.calendarName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = (if (isCurrent) MaterialTheme.colorScheme.primary else eventColor).copy(alpha = 0.8f)
-                    )
-                }
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(start = 78.dp, top = 8.dp, bottom = 4.dp)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (!event.location.isNullOrBlank()) {
-                    DetailRow(Icons.Default.LocationOn, event.location)
-                }
-                if (!event.description.isNullOrBlank()) {
-                    DetailRow(Icons.AutoMirrored.Filled.Notes, event.description)
-                }
-                
-                if (event.id != null) {
-                    Button(
-                        onClick = {
-                            val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id)
-                            val intent = Intent(Intent.ACTION_VIEW).setData(uri)
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.padding(top = 4.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        shape = RoundedCornerShape(8.dp)
+                if (event.calendarName != null || !event.location.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.open_in_calendar), style = MaterialTheme.typography.labelLarge)
+                        if (event.calendarName != null) {
+                            Text(
+                                text = event.calendarName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = (if (isCurrent) MaterialTheme.colorScheme.primary else eventColor).copy(alpha = 0.8f)
+                            )
+                        }
+                        if (!event.location.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = event.location,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.Top) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
