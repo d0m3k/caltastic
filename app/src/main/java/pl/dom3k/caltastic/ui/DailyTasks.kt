@@ -385,35 +385,40 @@ fun EventItem(
                 )
                 if (event.calendarName != null || !event.location.isNullOrBlank()) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (!event.location.isNullOrBlank()) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = event.location,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                        if (!event.location.isNullOrBlank() && event.calendarName != null) {
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
                         if (event.calendarName != null) {
                             Text(
                                 text = event.calendarName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = (if (isCurrent) MaterialTheme.colorScheme.primary else eventColor).copy(alpha = 0.8f)
+                                color = (if (isCurrent) MaterialTheme.colorScheme.primary else eventColor).copy(alpha = 0.8f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
-                        }
-                        if (!event.location.isNullOrBlank()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = event.location,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            }
                         }
                     }
                 }
