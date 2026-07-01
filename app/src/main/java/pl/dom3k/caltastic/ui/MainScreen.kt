@@ -93,8 +93,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     
     val isLoadingEvents by viewModel.isLoadingEvents.collectAsState()
 
+    val estimatedTodayIndex = remember { findIndexByDate(today, days, emptyMap(), smartToday = false) }
+
     var selectedDate by remember { mutableStateOf(today) }
-    val dailyTasksListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val dailyTasksListState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = estimatedTodayIndex)
     val dayTickerListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showCalendarSettings by remember { mutableStateOf(false) }

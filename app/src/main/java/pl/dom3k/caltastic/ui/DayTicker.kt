@@ -1,7 +1,5 @@
 package pl.dom3k.caltastic.ui
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -151,28 +149,20 @@ fun DayTickerItem(
     val dayOfMonth = date.dayOfMonth.toString()
     val isToday = date == LocalDate.now()
     
-    val containerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer 
                       else if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
-                      else Color.Transparent,
-        label = "containerColor"
-    )
+                      else Color.Transparent
     
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primary 
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.primary 
                       else if (isToday) MaterialTheme.colorScheme.primary
-                      else MaterialTheme.colorScheme.onSurface,
-        label = "contentColor"
-    )
+                      else MaterialTheme.colorScheme.onSurface
 
-    val elevation by animateDpAsState(
-        targetValue = if (isSelected) 4.dp else 0.dp,
-        label = "elevation"
-    )
+    val elevation = if (isSelected) 4.dp else 0.dp
 
+    val cardShape = remember { RoundedCornerShape(16.dp) }
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape,
         color = containerColor,
         tonalElevation = elevation,
         modifier = Modifier
@@ -209,7 +199,7 @@ fun DayTickerItem(
                     .padding(horizontal = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                val (allDay, timed) = events.partition { it.isAllDay }
+                val (allDay, timed) = remember(events) { events.partition { it.isAllDay } }
                 
                 // All day indicators: stacked full width bars
                 allDay.take(3).forEach { event ->
@@ -217,7 +207,7 @@ fun DayTickerItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(3.dp)
-                            .clip(RoundedCornerShape(1.5.dp))
+                            .clip(remember { RoundedCornerShape(1.5.dp) })
                             .background(
                                 event.color?.let { Color(it) } 
                                 ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
@@ -244,7 +234,7 @@ fun DayTickerItem(
                                 .fillMaxHeight()
                                 .align(Alignment.CenterStart)
                                 .offset(x = (40.dp) * startPercent)
-                                .clip(RoundedCornerShape(1.5.dp))
+                                .clip(remember { RoundedCornerShape(1.5.dp) })
                                 .background(
                                     event.color?.let { Color(it) } 
                                     ?: MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
